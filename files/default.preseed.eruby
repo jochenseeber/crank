@@ -1,0 +1,76 @@
+<% require "unix_crypt" %>
+# Basics
+d-i debconf debconf/frontend select Noninteractive
+
+# Locale
+d-i clock-setup/utc boolean true
+d-i clock-setup/utc-auto boolean true
+d-i console-setup/ask_detect boolean false
+d-i debian-installer/language string en
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/layout select Germany
+d-i keyboard-configuration/modelcode string pc105
+d-i keyboard-configuration/variant select German
+d-i localechooser/preferred-locale string en_US.UTF-8
+d-i localechooser/supported-locales en_US.UTF-8
+d-i pkgsel/install-language-support boolean false
+d-i time/zone string Europe/Berlin
+
+# Network
+d-i mirror/ftp/proxy string
+d-i mirror/http/proxy string
+d-i mirror/https/proxy string
+
+# Partitioning
+d-i finish-install/reboot_in_progress note
+d-i grub-installer/only_debian boolean true
+
+d-i finish-install/reboot_in_progress note
+d-i grub-installer/only_debian boolean true
+d-i partman-auto/choose_recipe select custom
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/confirm boolean true
+d-i partman-md/confirm_nooverwrite boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman/confirm_write_new_label boolean true
+
+<% if disk_count == 1 %>
+d-i partman-auto/disk string /dev/sda
+d-i partman-auto/expert_recipe string custom :: 1024 1024 1024 ext4 $lvmignore{ } $primary{ } $bootable{ } method{ format } format{ } use_filesystem{ } filesystem{ ext4 } label { boot } mountpoint{ /boot } . 1024 1034 8192 linux-swap $lvmignore{ } $primary{ } method{ swap } format{ } . 8192 8282 1048576 btrfs $lvmignore{ } $primary{ } method{ format } format{ } use_filesystem{ } filesystem{ btrfs } label { root } mountpoint{ / } .
+d-i partman-auto/method string regular
+<% else %>
+d-i partman-auto/method string raid
+d-i partman-auto/disk string /dev/sda /dev/sdb
+d-i partman-auto/expert_recipe string custom :: 1024 50 1024 raid $primary{ } $bootable{ } method{ raid } . 8192 50 8192 raid $primary{ } method{ raid } . 8192 10 -1 raid $primary{ } method{ raid } .
+d-i partman-auto-raid/recipe string 1 2 0 ext4 /boot /dev/sda1#/dev/sdb1 . 1 2 0 swap - /dev/sda2#/dev/sdb2 . 1 2 0 btrfs / /dev/sda3#/dev/sdb3 .
+<% end %>
+
+# Bootloader
+<% if disk_count == 1 %>
+d-i grub-installer/bootdev string /dev/sda
+<% else %>
+d-i grub-installer/bootdev string /dev/sda /dev/sdb
+<% end %>
+
+# User
+d-i passwd/make-user boolean false
+d-i passwd/root-login boolean true
+d-i passwd/root-password-crypted password <%= UnixCrypt::SHA512.build(password) %>
+d-i user-setup/allow-password-weak boolean true
+d-i user-setup/encrypt-home boolean false
+
+# Packages
+d-i pkgsel/include string curl emacs24-nox openssh-server
+d-i pkgsel/install-language-support boolean false
+d-i pkgsel/language-pack-patterns string
+d-i pkgsel/update-policy select none
+d-i pkgsel/upgrade select safe-upgrade
+
+# Configure system
+d-i preseed/late_command string cd /target/root ; mkdir .ssh ; chmod 0700 .ssh ; echo '<%= ssh_key %>' >.ssh/authorized_keys ; chmod 0600 .ssh/authorized_keys

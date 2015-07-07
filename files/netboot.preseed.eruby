@@ -1,0 +1,14 @@
+d-i console-setup/ask_detect boolean false
+d-i debian-installer/country string DE
+d-i debian-installer/language string en
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/layoutcode string de
+
+# Network
+d-i mirror/ftp/proxy string
+d-i mirror/http/proxy string
+d-i mirror/https/proxy string
+
+# Network console
+d-i anna/choose_modules string network-console
+d-i network-console/authorized_keys_url string <%= base_url %>/authorized_keys
