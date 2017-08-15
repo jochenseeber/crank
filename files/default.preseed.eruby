@@ -28,27 +28,47 @@ d-i grub-installer/only_debian boolean true
 d-i finish-install/reboot_in_progress note
 d-i grub-installer/only_debian boolean true
 d-i partman-auto/choose_recipe select custom
+d-i partman-auto/disk string /dev/sda
+d-i partman-basicfilesystems/choose_label string gpt
+d-i partman-basicfilesystems/default_label string gpt
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-md/confirm boolean true
 d-i partman-md/confirm_nooverwrite boolean true
 d-i partman-md/device_remove_md boolean true
+d-i partman-partitioning/choose_label string gpt
+d-i partman-partitioning/confirm_copy boolean true
 d-i partman-partitioning/confirm_write_new_label boolean true
-d-i partman/choose_partition select finish
+d-i partman-partitioning/default_label string gpt
+d-i partman-auto/alignment string optimal
+d-i partman/choose_label string gpt
+d-i partman/choose_partition select Finish
 d-i partman/confirm boolean true
+d-i partman/confirm_new_label boolean true
 d-i partman/confirm_nooverwrite boolean true
 d-i partman/confirm_write_new_label boolean true
+d-i partman/default_label string gpt
+partman-partitioning partman-partitioning/choose_label select gpt
 
 <% if disk_count == 1 %>
 d-i partman-auto/disk string /dev/sda
-d-i partman-auto/expert_recipe string custom :: 1024 1024 1024 ext4 $lvmignore{ } $primary{ } $bootable{ } method{ format } format{ } use_filesystem{ } filesystem{ ext4 } label { boot } mountpoint{ /boot } . 1024 1034 8192 linux-swap $lvmignore{ } $primary{ } method{ swap } format{ } . 8192 8282 1048576 btrfs $lvmignore{ } $primary{ } method{ format } format{ } use_filesystem{ } filesystem{ btrfs } label { root } mountpoint{ / } .
+d-i partman-auto/expert_recipe string custom :: \
+    1 50 1 free $gptonly{ } $primary{ } $bios_boot{ } method{ biosgrub } . \
+    1024 50 1024 ext4 $gptonly{ } $primary{ } method{ format } format{ } use_filesystem{ } filesystem{ ext4 } mountpoint{ /boot } . \
+    1024 50 8192 linux-swap $gptonly{ } $primary{ } method{ swap } format{ } . \
+    8192 10 -1 btrfs $gptonly{ } $primary{ } method{ format } format{ } use_filesystem{ } filesystem{ btrfs } mountpoint{ / } .
 d-i partman-auto/method string regular
 <% else %>
-d-i partman-auto/method string raid
+d-i partman-auto/choose_recipe select custom
 d-i partman-auto/disk string /dev/sda /dev/sdb
-d-i partman-auto/expert_recipe string custom :: 1024 50 1024 raid $primary{ } $bootable{ } method{ raid } . 8192 50 8192 raid $primary{ } method{ raid } . 8192 10 -1 raid $primary{ } method{ raid } .
-d-i partman-auto-raid/recipe string 1 2 0 ext4 /boot /dev/sda1#/dev/sdb1 . 1 2 0 swap - /dev/sda2#/dev/sdb2 . 1 2 0 btrfs / /dev/sda3#/dev/sdb3 .
+d-i partman-auto/expert_recipe string custom :: \
+    1 50 1 free $gptonly{ } $primary{ } $bios_boot{ } method{ biosgrub } . \
+    1024 50 1024 raid $primary{ } method{ raid } . \
+    8192 50 8192 raid $primary{ } method{ raid } . \
+    8192 10 -1 raid $primary{ } method{ raid } .
+d-i partman-auto/method string raid
+d-i partman-auto-raid/recipe string 1 2 0 ext4 /boot /dev/sda2#/dev/sdb2 . 1 2 0 swap - /dev/sda3#/dev/sdb3 . 1 2 0 btrfs / /dev/sda4#/dev/sdb4 .
 <% end %>
 
 # Bootloader
@@ -66,7 +86,7 @@ d-i user-setup/allow-password-weak boolean true
 d-i user-setup/encrypt-home boolean false
 
 # Packages
-d-i pkgsel/include string curl emacs24-nox openssh-server
+d-i pkgsel/include string sudo curl emacs24-nox openssh-server
 d-i pkgsel/install-language-support boolean false
 d-i pkgsel/language-pack-patterns string
 d-i pkgsel/update-policy select none

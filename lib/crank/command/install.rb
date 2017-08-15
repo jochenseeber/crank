@@ -13,6 +13,7 @@ require "securerandom"
 require "socket"
 require "timeout"
 require "webrick"
+require "set"
 
 module Crank
   module Command
@@ -301,19 +302,27 @@ module Crank
 
       def disk_install(ssh:, options:)
         puts "==> Delete RAID devices"
+        raid_devices = Set.new
+        disk_devices = Set.new
+
         output = ssh.execute("lsblk -l -i -n -p -o NAME,TYPE")
         output.stdout.each do |line|
           if line =~ %r{^([a-z0-9/]+)\s+raid[0-9]+$}
-            puts "==> Deleting raid #{$1}"
-            ssh.execute("mdadm --stop #{$1}")
+            raid_devices << $1
+          end
+          if line =~ %r{^([a-z0-9/]+)\s+part$}
           end
         end
 
-        output.stdout.each do |line|
-          if line =~ %r{^([a-z0-9/]+)\s+part$}
-            puts "==> Zeroing superblock on #{$1}"
-            ssh.execute("mdadm --zero-superblock  #{$1}")
-          end
+        raid_devices.each do |d|
+          puts "==> Deleting raid #{d}"
+          ssh.execute("mdadm --stop #{d}")
+        end
+
+        puts "==> Deleting raid #{$1}"
+        disk_devices.each do |d|
+          puts "==> Zeroing superblock on #{d}"
+          ssh.execute("mdadm --zero-superblock #{d}")
         end
 
         puts "==> Partitioning disk"
@@ -321,6 +330,15 @@ module Crank
         ssh.execute("parted -s -a optimal /dev/sda mklabel msdos")
         ssh.execute("parted -s -a optimal /dev/sda mkpart primary ext4 0% 1024")
         ssh.execute("parted -s -a optimal /dev/sda set 1 boot on")
+
+        # GPT (not working)
+        # ssh.execute("parted -s -a optimal /dev/sda mklabel gpt")
+        # ssh.execute("parted -s -a optimal /dev/sda mkpart primary 2048s 4095s")
+        # ssh.execute("parted -s -a optimal /dev/sda mkpart primary ext4 4096s 1GiB")
+        # ssh.execute("parted -s -a optimal /dev/sda set 1 bios_grub on")
+        # ssh.execute("parted -s -a optimal /dev/sda set 2 legacy_boot on")
+
+        ssh.execute("if [ -e /dev/sdb ]; then parted -s -a optimal /dev/sdb mklabel msdos; fi")
 
         puts "==> Creating file system"
         ssh.execute("mkfs.ext4 /dev/sda1")
