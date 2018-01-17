@@ -33,6 +33,7 @@ module Crank
       attr_reader :directories
       attr_reader :domainname
       attr_reader :hostname
+      attr_reader :interactive
       attr_reader :ipaddress
       attr_reader :mode
       attr_reader :password
@@ -62,6 +63,7 @@ module Crank
         @sudo = options.sudo.nil? ? (@ssh_user != "root") : options.sudo
         @username = "root"
         @version = options.version || "xenial"
+        @interactive = options.interactive
       end
 
       def run
@@ -124,6 +126,7 @@ module Crank
         command.option "-a", "--ipaddress STRING", String, "IP and netmask address of the server"
         command.option "-c", "--config STRING", String, "Name of configuration file"
         command.option "-d", "--directory STRING", Array, "Additional directory to serve configuration files from"
+        command.option "-i", "--interactive", "Interactive installation"
         command.option "-m", "--mode String", "Installation mode (kexec, disk or qemu)"
         command.option "-p", "--password STRING", String, "Password for the user created by the installer"
         command.option "-r", "--[no-]reboot", "Automatically reboot system during installation"
@@ -311,6 +314,7 @@ module Crank
             raid_devices << $1
           end
           if line =~ %r{^([a-z0-9/]+)\s+part$}
+            disk_devices << $1
           end
         end
 
@@ -330,13 +334,6 @@ module Crank
         ssh.execute("parted -s -a optimal /dev/sda mklabel msdos")
         ssh.execute("parted -s -a optimal /dev/sda mkpart primary ext4 0% 1024")
         ssh.execute("parted -s -a optimal /dev/sda set 1 boot on")
-
-        # GPT (not working)
-        # ssh.execute("parted -s -a optimal /dev/sda mklabel gpt")
-        # ssh.execute("parted -s -a optimal /dev/sda mkpart primary 2048s 4095s")
-        # ssh.execute("parted -s -a optimal /dev/sda mkpart primary ext4 4096s 1GiB")
-        # ssh.execute("parted -s -a optimal /dev/sda set 1 bios_grub on")
-        # ssh.execute("parted -s -a optimal /dev/sda set 2 legacy_boot on")
 
         ssh.execute("if [ -e /dev/sdb ]; then parted -s -a optimal /dev/sdb mklabel msdos; fi")
 
@@ -415,6 +412,10 @@ module Crank
           "netcfg/choose_interface" => "auto",
           "hostname" => options.hostname,
         }
+
+        if interactive
+          kernel_options["preseed/interactive"] = "true"
+        end
 
         if not dhcp
           static_options = {
